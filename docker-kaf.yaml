@@ -1,0 +1,31 @@
+services:
+  zookeeper:
+    image: zookeeper:3.6.3
+    ports:
+      - "2181:2181"
+    environment:
+      # Allows the "ruok" health probe below to run
+      ZOO_4LW_COMMANDS_WHITELIST: srvr,ruok
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc -w 2 localhost 2181 | grep -q imok"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  kafka:
+    image: wurstmeister/kafka:2.13-2.7.0
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # Give Zookeeper time to answer on slower / Windows+WSL2 machines
+      KAFKA_ZOOKEEPER_CONNECTION_TIMEOUT_MS: 60000
+      KAFKA_ZOOKEEPER_SESSION_TIMEOUT_MS: 60000
+    # Wait until Zookeeper is actually accepting connections, not just started
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    restart: on-failure
